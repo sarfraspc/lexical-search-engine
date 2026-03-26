@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lexical Search</title>
+    <style>
+      :root {
+        --bg: #f3efe8;
+        --panel: #fff;
+        --text: #1f2a34;
+        --muted: #5a6570;
+        --line: #ddd0c0;
+        --accent: #cc6a3e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: radial-gradient(circle at 10% 10%, #f6dcc3 0, transparent 35%),
+          radial-gradient(circle at 90% 80%, #c7dfdb 0, transparent 30%), var(--bg);
+        color: var(--text);
+      }
+      main {
+        max-width: 900px;
+        margin: 2rem auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 1rem;
+      }
+      h1 { margin: 0 0 0.25rem; }
+      p { color: var(--muted); }
+      form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.6rem;
+        margin: 1rem 0;
+      }
+      input {
+        padding: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-size: 1rem;
+      }
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.75;
+        cursor: not-allowed;
+      }
+      .meta { margin: 0.5rem 0 0.9rem; color: var(--muted); }
+      .error { color: #a12a2a; }
+      .loading { color: #7b3b23; }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.8rem;
+        margin: 0.65rem 0;
+        background: #fffdf9;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8rem;
+        align-items: center;
+      }
+      .doc {
+        margin: 0;
+        font-family: Consolas, monospace;
+        font-size: 0.95rem;
+        word-break: break-all;
+      }
+      .score {
+        padding: 0.18rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid #e7b89b;
+        background: #f9e7dc;
+        color: #7b3b23;
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+      @media (max-width: 700px) {
+        form { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Lexical Search</h1>
+      <p>Manual TF-IDF + cosine similarity over local documents.</p>
+
+      <form id="searchForm">
+        <input id="queryInput" value="artificial intelligence in finance" />
+        <button id="searchButton" type="submit">Search</button>
+      </form>
+
+      <div id="meta" class="meta">Ready</div>
+      <section id="results"></section>
+    </main>
+
+    <script>
+      const form = document.getElementById("searchForm");
+      const input = document.getElementById("queryInput");
+      const meta = document.getElementById("meta");
+      const resultsEl = document.getElementById("results");
+      const searchButton = document.getElementById("searchButton");
+
+      function asPercent(score) {
+        return `${(score * 100).toFixed(1)}%`;
+      }
+
+      function renderResults(items) {
+        resultsEl.innerHTML = "";
+        if (!items.length) {
+          resultsEl.innerHTML = '<div class="card">No results.</div>';
+          return;
+        }
+
+        for (const item of items) {
+          const card = document.createElement("article");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="row">
+              <h2 class="doc">${item.document}</h2>
+              <span class="score">${asPercent(item.score)}</span>
+            </div>
+            <p>${formatSnippet(item.snippet)}</p>
+          `;
+          resultsEl.appendChild(card);
+        }
+      }
+
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function formatSnippet(text) {
+        const safe = escapeHtml(text);
+        return safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = input.value.trim();
+        if (!query) {
+          meta.innerHTML = '<span class="error">Enter a query.</span>';
+          return;
+        }
+
+        searchButton.disabled = true;
+        searchButton.textContent = "Searching...";
+        meta.innerHTML = '<span class="loading">Searching...</span>';
+        resultsEl.innerHTML = "";
+
+        try {
+          const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || "Request failed");
+          }
+
+          meta.textContent = `${data.results.length} results`;
+          renderResults(data.results);
+        } catch (error) {
+          meta.innerHTML = `<span class="error">${error.message}</span>`;
+          resultsEl.innerHTML = '<div class="card error">Search failed. Please try again.</div>';
+        } finally {
+          searchButton.disabled = false;
+          searchButton.textContent = "Search";
+        }
+      });
+    </script>
+  </body>
+</html>
