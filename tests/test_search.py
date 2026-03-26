@@ -1,12 +1,5 @@
 """Tests for cosine similarity and ranking."""
 
-from pathlib import Path
-import sys
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-   
 import math
 
 from app.search import cosine_similarity, rank_documents, top_k_results
